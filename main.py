@@ -1,6 +1,16 @@
-def main():
-    print("Hello from friday!")
+"""
+AI Ecosystem FastAPI - Application Entry Point
+Assignment 5: FastAPI and API for AI Ecosystem
+"""
+import uvicorn
+from backend.main import app  # noqa: F401
 
 
 if __name__ == "__main__":
-    main()
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+    )
