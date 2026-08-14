@@ -1,0 +1,7 @@
+﻿no,method,path,tag,summary,description,request_body_required,request_content_type,response_200_description,response_201_description,response_4xx_codes,parameters,operation_id,snapshot_at
+1,GET,/api/v1/health,Health,Health Check,ตรวจสอบสถานะของระบบ AI Ecosystem และ services ที่เกี่ยวข้อง,No,-,Successful Response,-,-,-,health_check_api_v1_health_get,2026-08-14 13:34:19
+2,POST,/api/v1/auth/register,Authentication,Register a new user,สร้างบัญชีผู้ใช้ใหม่ใน AI Ecosystem พร้อม hashed password,Yes,application/json,-,Successful Response,422,-,register_api_v1_auth_register_post,2026-08-14 13:34:19
+3,POST,/api/v1/auth/login,Authentication,User Login,เข้าสู่ระบบด้วย username/password รับ JWT Bearer Token,Yes,application/json,Successful Response,-,422,-,login_api_v1_auth_login_post,2026-08-14 13:34:19
+4,POST,/api/v1/data/datasets,Data Ingestion,Create Dataset,"สร้าง Dataset ใหม่เพื่อเก็บข้อมูล AI (รูปภาพ, ข้อความ, เสียง ฯลฯ)",Yes,application/json,-,Successful Response,422,-,create_dataset_api_v1_data_datasets_post,2026-08-14 13:34:19
+5,POST,/api/v1/inference/predict,Inference,Real-time Inference,ส่ง input data เข้า AI Model แล้วรับผลการทำนายพร้อม confidence score,Yes,application/json,Successful Response,-,422,-,predict_api_v1_inference_predict_post,2026-08-14 13:34:19
+6,GET,/,Root,Root,-,No,-,Successful Response,-,-,-,root__get,2026-08-14 13:34:19

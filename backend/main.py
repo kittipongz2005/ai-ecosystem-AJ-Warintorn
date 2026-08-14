@@ -22,33 +22,98 @@ async def lifespan(app: FastAPI):
     print("[STOP] AI Ecosystem API shutting down...")
 
 
+# ─── OpenAPI Tag Metadata ─────────────────────────────────────────────────────
+# อ้างอิง: https://fastapi.tiangolo.com/tutorial/metadata/
+tags_metadata = [
+    {
+        "name": "Health",
+        "description": (
+            "ตรวจสอบสถานะของระบบ AI Ecosystem และ services ที่เกี่ยวข้องทั้งหมด "
+            "(API server, PostgreSQL, MinIO, Label Studio, Model Registry)"
+        ),
+    },
+    {
+        "name": "Authentication",
+        "description": (
+            "ลงทะเบียนและเข้าสู่ระบบ AI Ecosystem. "
+            "รองรับการสร้างบัญชีใหม่และออก **JWT Bearer Token** สำหรับ authenticate request อื่น ๆ"
+        ),
+    },
+    {
+        "name": "Data Ingestion",
+        "description": (
+            "สร้างและจัดการ Dataset สำหรับเก็บข้อมูล AI. "
+            "รองรับหลาย format: `image`, `video`, `text`, `json`, `csv`, `audio`. "
+            "Dataset ที่สร้างจะผูกกับ MinIO bucket สำหรับเก็บไฟล์จริงใน production."
+        ),
+    },
+    {
+        "name": "Inference",
+        "description": (
+            "ส่ง input data เข้า AI Model แบบ real-time และรับผลการทำนายพร้อม confidence score. "
+            "รองรับ image URL, base64 image และ text input. "
+            "คืน `latency_ms` สำหรับ performance monitoring."
+        ),
+    },
+]
+
 app = FastAPI(
+    # ─── ข้อมูลพื้นฐานของ API ────────────────────────────────────────────────
     title="AI Ecosystem API",
+    summary="REST API หลักสำหรับ AI Ecosystem — FastAPI Assignment 5",
     description="""
-## AI Ecosystem API — FastAPI Assignment 5
+## 🤖 AI Ecosystem API
 
-ระบบ API หลักสำหรับ AI Ecosystem ประกอบด้วย 5 endpoints สำคัญ:
+ระบบ Backend API สำหรับ **AI Ecosystem** ที่ประกอบด้วยบริการ AI ครบวงจร:
+ตั้งแต่การ **จัดการข้อมูล** (Data Ingestion) ไปถึง **การทำนายผล** (Inference) ด้วย AI Model
 
-- 🏥 **Health** — ตรวจสอบสถานะระบบ
-- 🔐 **Authentication** — ลงทะเบียนและ Login รับ JWT Token
-- 📥 **Data Ingestion** — สร้าง Dataset สำหรับเก็บข้อมูล AI
-- ⚡ **Inference** — ส่งข้อมูลเข้า Model แล้วรับผลการทำนาย
+### 🏗️ Architecture Components
+| Component | คำอธิบาย |
+|-----------|----------|
+| **FastAPI** | Web framework หลัก พร้อม async support |
+| **Pydantic v2** | Data validation ด้วย type hints |
+| **PostgreSQL** | Relational database (via Docker) |
+| **MinIO** | S3-compatible object storage สำหรับไฟล์ AI |
+| **Label Studio** | Data labeling platform สำหรับ annotation |
+
+### 🌐 5 Core Endpoints
+| # | Method | Endpoint | คำอธิบาย |
+|---|--------|----------|----------|
+| 1 | `GET`  | `/api/v1/health` | ตรวจสอบสถานะระบบ |
+| 2 | `POST` | `/api/v1/auth/register` | ลงทะเบียนผู้ใช้ใหม่ |
+| 3 | `POST` | `/api/v1/auth/login` | เข้าสู่ระบบรับ JWT Token |
+| 4 | `POST` | `/api/v1/data/datasets` | สร้าง Dataset container |
+| 5 | `POST` | `/api/v1/inference/predict` | ทำนายผลด้วย AI Model |
+
+### 📖 API Documentation
+- **Swagger UI** (Interactive): [/docs](/docs)
+- **ReDoc** (Readable): [/redoc](/redoc)
+- **OpenAPI JSON** (Download): [/openapi.json](/openapi.json)
     """,
     version="1.0.0",
+
+    # ─── ข้อมูลผู้พัฒนา ──────────────────────────────────────────────────────
     contact={
         "name": "AI Ecosystem Team",
+        "url": "https://github.com/kittipongz2005/ai-ecosystem-AJ-Warintorn",
         "email": "team@ai-ecosystem.dev",
     },
     license_info={
-        "name": "MIT",
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
     },
+    terms_of_service="https://github.com/kittipongz2005/ai-ecosystem-AJ-Warintorn",
+
+    # ─── OpenAPI / Swagger Paths ──────────────────────────────────────────────
+    docs_url="/docs",        # Swagger UI
+    redoc_url="/redoc",      # ReDoc UI
+    openapi_url="/openapi.json",  # OpenAPI schema (ดาวน์โหลดเพื่อแปลงเป็น CSV ได้)
+
+    # ─── Tag Metadata (จาก tags_metadata ด้านบน) ─────────────────────────────
+    openapi_tags=tags_metadata,
+
+    # ─── Lifespan (startup/shutdown hooks) ───────────────────────────────────
     lifespan=lifespan,
-    openapi_tags=[
-        {"name": "Health",         "description": "ตรวจสอบสถานะระบบ"},
-        {"name": "Authentication", "description": "ลงทะเบียนและเข้าสู่ระบบ"},
-        {"name": "Data Ingestion", "description": "สร้างและจัดการ Dataset"},
-        {"name": "Inference",      "description": "ทำนายผลด้วย AI Model"},
-    ],
 )
 
 # ─── CORS Middleware ────────────────────────────────────────────────────────────
