@@ -1,6 +1,76 @@
 version: '3.9'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: ai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "{{.Name}}"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ai-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - minio
+      - db
+    environment:
+      - DATABASE_URL=postgresql://labelstudio:password123@db:5432/labelstudio_data
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_SECURE=false
+      - REDIS_URL=redis://redis:6379/0
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "{{.Name}}"
+
+  trainer-worker:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+    container_name: ai-trainer-worker
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - minio
+    environment:
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_SECURE=false
+      - REDIS_URL=redis://redis:6379/0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "{{.Name}}"
+
   db:
     image: postgres:15
     container_name: label-studio-db
@@ -66,6 +136,7 @@ services:
         tag: "{{.Name}}"
 
 volumes:
+  redis-data:
   postgresql-data:
   label-studio-data:
   minio-data:

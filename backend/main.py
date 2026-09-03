@@ -11,6 +11,7 @@ from backend.routers import (
     auth,
     data_ingestion,
     inference,
+    train,
 )
 
 
@@ -53,6 +54,13 @@ tags_metadata = [
             "ส่ง input data เข้า AI Model แบบ real-time และรับผลการทำนายพร้อม confidence score. "
             "รองรับ image URL, base64 image และ text input. "
             "คืน `latency_ms` สำหรับ performance monitoring."
+        ),
+    },
+    {
+        "name": "Training",
+        "description": (
+            "จัดการคิวการเทรน AI Model (Token Classification / NER) ด้วย Redis Queue (RQ). "
+            "รองรับการตั้งเวลาการเริ่มเทรน (Delayed/Scheduled queue) และดึงสถานะงาน"
         ),
     },
 ]
@@ -125,11 +133,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── Routers (5 endpoints only) ────────────────────────────────────────────────
+# ─── Routers ──────────────────────────────────────────────────────────────────
 app.include_router(health.router,         prefix="/api/v1",       tags=["Health"])
 app.include_router(auth.router,           prefix="/api/v1/auth",  tags=["Authentication"])
 app.include_router(data_ingestion.router, prefix="/api/v1/data",  tags=["Data Ingestion"])
 app.include_router(inference.router,      prefix="/api/v1/inference", tags=["Inference"])
+app.include_router(train.router,          prefix="/api/v1",       tags=["Training"])
 
 
 @app.get("/", tags=["Root"])
@@ -137,7 +146,6 @@ async def root():
     return {
         "message": "🤖 Welcome to AI Ecosystem API",
         "version": "1.0.0",
-        "endpoints": 5,
         "docs": "/docs",
         "redoc": "/redoc",
     }

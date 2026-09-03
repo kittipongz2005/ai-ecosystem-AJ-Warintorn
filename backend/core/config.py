@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     MINIO_BUCKET_NAME: str = "my-images"
     MINIO_SECURE: bool = False
 
+    # ========== Redis ==========
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+
     # ตั้งค่าให้ดึงข้อมูลจากไฟล์ .env (Pydantic v2 style)
     model_config = SettingsConfigDict(
         env_file='.env',
