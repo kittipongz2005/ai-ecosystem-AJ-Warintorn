@@ -11,7 +11,9 @@ from backend.schemas.train import (
     TrainJobResponse,
     TrainJobStatusResponse
 )
-from workers.tasks import train_token_classification_job
+
+TASK_FUNCTION_PATH = "workers.tasks.train_token_classification_job"
+
 
 router = APIRouter(prefix="/train", tags=["Training"])
 
@@ -65,7 +67,7 @@ async def enqueue_training_job(req: TrainJobCreateRequest):
             # Scheduled job
             job = q.enqueue_at(
                 target_time,
-                train_token_classification_job,
+                TASK_FUNCTION_PATH,
                 job_id=job_id,
                 kwargs=job_kwargs,
                 job_timeout="2h"
@@ -74,7 +76,7 @@ async def enqueue_training_job(req: TrainJobCreateRequest):
         else:
             # Immediate job
             job = q.enqueue(
-                train_token_classification_job,
+                TASK_FUNCTION_PATH,
                 job_id=job_id,
                 kwargs=job_kwargs,
                 job_timeout="2h"

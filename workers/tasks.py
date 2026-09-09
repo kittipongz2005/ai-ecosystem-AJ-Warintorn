@@ -1,4 +1,4 @@
-import os
+﻿import os
 import io
 import json
 import logging
@@ -14,6 +14,8 @@ from transformers import (
     Trainer
 )
 from minio import Minio
+import mlflow
+import mlflow.transformers
 
 def setup_logger(log_file_path: str):
     logger = logging.getLogger("trainer_worker")
@@ -40,6 +42,15 @@ def get_minio_client():
         secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin123"),
         secure=os.getenv("MINIO_SECURE", "false").lower() == "true"
     )
+
+def setup_mlflow():
+    mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+    mlflow.set_tracking_uri(mlflow_uri)
+    os.environ["MLFLOW_S3_ENDPOINT_URL"] = f"http://{os.getenv('MINIO_ENDPOINT', 'minio:9000')}"
+    os.environ["AWS_ACCESS_KEY_ID"] = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+    os.environ["AWS_SECRET_ACCESS_KEY"] = os.getenv("MINIO_SECRET_KEY", "minioadmin123")
+    os.environ["MLFLOW_S3_IGNORE_TLS"] = "true"
+    mlflow.set_experiment("Token-Classification-NER")
 
 def download_dataset_from_minio(client: Minio, bucket_name: str, dataset_prefix: str, local_dir: str):
     os.makedirs(local_dir, exist_ok=True)
@@ -88,7 +99,7 @@ def train_token_classification_job(
     log_file = os.path.join(work_dir, f"train_{job_id}.log")
     logger = setup_logger(log_file)
 
-    logger.info(f"=== Starting Training Job: {job_id} ===")
+    logger.info(f"=== Starting Training Job with MLflow: {job_id} ===")
     logger.info(f"PyTorch Version: {torch.__version__}")
     is_cuda = torch.cuda.is_available()
     logger.info(f"CUDA Available: {is_cuda}")
@@ -97,6 +108,7 @@ def train_token_classification_job(
     else:
         logger.info("Using CPU for training.")
 
+    setup_mlflow()
     minio_client = get_minio_client()
 
     logger.info(f"Downloading dataset from MinIO: {dataset_bucket}/token-classification/{dataset_name}")
@@ -118,7 +130,6 @@ def train_token_classification_job(
     logger.info(f"Loaded train samples: {len(raw_datasets['train'])}")
     logger.info(f"Loaded validation samples: {len(raw_datasets['validation'])}")
 
-    logger.info(f"Loading Tokenizer and Pretrained Model: {base_model_name}")
     tokenizer = AutoTokenizer.from_pretrained(base_model_name)
     num_labels = 9
 
@@ -184,31 +195,52 @@ def train_token_classification_job(
         data_collator=data_collator
     )
 
-    logger.info("Starting Model Training Loop...")
-    train_result = trainer.train()
-    logger.info(f"Training Finished. Metrics: {train_result.metrics}")
+    with mlflow.start_run(run_name=f"job_{job_id}") as run:
+        mlflow.log_params({
+            "base_model": base_model_name,
+            "dataset": dataset_name,
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "learning_rate": learning_rate,
+            "max_samples": max_samples
+        })
 
-    logger.info(f"Saving Model and Tokenizer to {output_model_dir}...")
-    trainer.save_model(output_model_dir)
-    tokenizer.save_pretrained(output_model_dir)
+        logger.info("Starting Model Training Loop...")
+        train_result = trainer.train()
+        logger.info(f"Training Finished. Metrics: {train_result.metrics}")
 
-    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
-    minio_model_prefix = f"token-classification/{job_id}_{timestamp}"
+        for k, v in train_result.metrics.items():
+            if isinstance(v, (int, float)):
+                mlflow.log_metric(k, v)
 
-    logger.info(f"Uploading trained model to MinIO: {model_bucket}/{minio_model_prefix}")
-    upload_directory_to_minio(minio_client, model_bucket, output_model_dir, minio_model_prefix)
+        logger.info(f"Saving Model and Tokenizer to {output_model_dir}...")
+        trainer.save_model(output_model_dir)
+        tokenizer.save_pretrained(output_model_dir)
 
-    logger.info("Uploading training log to MinIO...")
-    minio_client.fput_object(
-        model_bucket,
-        f"{minio_model_prefix}/training.log",
-        log_file
-    )
+        # Log & Register to MLflow Model Registry
+        logger.info("Logging Model to MLflow and Registering to Model Registry...")
+        try:
+            mlflow.transformers.log_model(
+                transformers_model={"model": model, "tokenizer": tokenizer},
+                artifact_path="model",
+                registered_model_name="token-classification-model"
+            )
+        except Exception as e:
+            logger.warning(f"Could not register to MLflow Registry: {e}")
 
-    logger.info(f"=== Job {job_id} Completed Successfully! Model saved at {model_bucket}/{minio_model_prefix} ===")
+        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
+        minio_model_prefix = f"token-classification/{job_id}_{timestamp}"
+
+        upload_directory_to_minio(minio_client, model_bucket, output_model_dir, minio_model_prefix)
+        minio_client.fput_object(model_bucket, f"{minio_model_prefix}/training.log", log_file)
+
+        run_id = run.info.run_id
+
+    logger.info(f"=== Job {job_id} Completed Successfully! MLflow Run ID: {run_id} ===")
     return {
         "status": "success",
         "job_id": job_id,
+        "mlflow_run_id": run_id,
         "model_path": f"{model_bucket}/{minio_model_prefix}",
         "metrics": train_result.metrics
     }
